@@ -162,10 +162,13 @@ class AthenaLoader(DataLoader):
             )
 
         # Results file: <output_prefix>/<exec_id>.csv
-        bucket, prefix_key = (
-            self._output_s3_prefix.removeprefix("s3://").split("/", 1)
-        )
-        result_key = f"{prefix_key}/{exec_id}.csv"
+        without_prefix = self._output_s3_prefix.removeprefix("s3://")
+        bucket, _, prefix_key = without_prefix.partition("/")
+        if not bucket:
+            raise ValueError(
+                f"Invalid output_s3_prefix: {self._output_s3_prefix!r}"
+            )
+        result_key = f"{prefix_key}/{exec_id}.csv" if prefix_key else f"{exec_id}.csv"
         logger.info("Downloading Athena result s3://%s/%s", bucket, result_key)
         body = s3.get_object(Bucket=bucket, Key=result_key)["Body"]
         return pd.read_csv(body)

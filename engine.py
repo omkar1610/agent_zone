@@ -307,7 +307,7 @@ class MonthlyPanelBuilder:
                         "downgrade_count": downgrade_count,
                         "addaccount_count": addaccount_count,
                         "reduceaccount_count": reduceaccount_count,
-                        "is_renewal_month": int(m > 0 and billing_cycle > 0 and m % billing_cycle == 0),
+                        "is_renewal_month": int(billing_cycle > 0 and m % billing_cycle == 0),
                         "censored": int(not tl.churned),
                     }
                 )
@@ -432,14 +432,15 @@ class CohortFallback:
     def __init__(self) -> None:
         self._cohort_stats: Dict[int, Dict[str, float]] = {}
 
-    def fit(self, timelines: Dict[str, OrderTimeline]) -> None:
+    def fit(self, timelines: Dict[str, OrderTimeline], reference_date: Optional[date] = None) -> None:
+        ref = reference_date or date.today()
         records: List[Dict[str, Any]] = []
         for tl in timelines.values():
             billing_cycle = tl.states[-1].billing_cycle if tl.states else 12
             total_months = max(
                 months_between(
                     tl.creation_date,
-                    tl.churn_date or date.today(),
+                    tl.churn_date or ref,
                 ),
                 1,
             )
@@ -521,26 +522,26 @@ class LTVEngine:
         self._panel = panel_builder.build(self._timelines, self._reference_date)
 
         # Stage 3 – cohort fallback (always computed as safety net)
-        self._cohort_fallback.fit(self._timelines)
+        self._cohort_fallback.fit(self._timelines, reference_date=self._reference_date)
 
         # Stage 4 – decide whether ML is feasible
         n_orders = len(self._timelines)
-        n_renewal_events = int(
+        n_churn_events = int(
             self._panel["churn_event"].sum()
         ) if not self._panel.empty else 0
 
         if (
             not self._panel.empty
             and n_orders >= MIN_ML_ORDERS
-            and n_renewal_events >= MIN_ML_EVENTS
+            and n_churn_events >= MIN_ML_EVENTS
         ):
             self._diagnostics = self._train_ml_models()
         else:
             logger.info(
-                "Insufficient data for ML (%d orders, %d events) – "
+                "Insufficient data for ML (%d orders, %d churn events) – "
                 "using cohort fallback.",
                 n_orders,
-                n_renewal_events,
+                n_churn_events,
             )
             self._diagnostics = ModelDiagnostics(
                 survival_model_type="cohort_fallback",

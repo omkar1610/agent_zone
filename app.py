@@ -22,11 +22,10 @@ import logging
 import sys
 from contextlib import asynccontextmanager
 from datetime import date
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import pandas as pd
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import JSONResponse
 
 from data_loader import AthenaLoader, FileLoader, S3Loader
 from engine import LTVEngine
@@ -97,7 +96,7 @@ app = FastAPI(
 def _load_data_from_files(
     orders_file: UploadFile,
     transactions_file: UploadFile,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     try:
         orders_bytes = orders_file.file.read()
         transactions_bytes = transactions_file.file.read()
@@ -116,7 +115,7 @@ def _load_data_from_files(
         ) from exc
 
 
-def _load_data_from_s3(source: S3Source) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _load_data_from_s3(source: S3Source) -> Tuple[pd.DataFrame, pd.DataFrame]:
     loader = S3Loader(
         orders_s3_path=source.orders_s3_path,
         transactions_s3_path=source.transactions_s3_path,
@@ -133,7 +132,7 @@ def _load_data_from_s3(source: S3Source) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 def _load_data_from_athena(
     source: AthenaSource,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     loader = AthenaLoader(
         orders_query=source.orders_query,
         transactions_query=source.transactions_query,
